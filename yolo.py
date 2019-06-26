@@ -166,6 +166,33 @@ class YOLO(object):
         print(end - start)
         return image
 
+    def detect_boxes(self, image):
+        start = timer()
+
+        if self.model_image_size != (None, None):
+            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        else:
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            boxed_image = letterbox_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
+
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_data,
+                self.input_image_shape: [image.size[1], image.size[0]],
+                K.learning_phase(): 0
+            })
+
+        end = timer()
+        return out_boxes, out_scores, out_classes, end - start
+
     def close_session(self):
         self.sess.close()
 
@@ -209,4 +236,3 @@ def detect_video(yolo, video_path, output_path=""):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     yolo.close_session()
-
